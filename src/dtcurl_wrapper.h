@@ -16,6 +16,7 @@
 #include "curl/curl.h"
 
 #include "dtcurl_buffer.h"
+#include "dtcurl_lock.h"
 
 #define CURL_MAX_TIMEOUT 10000
 #define CURL_MAX_CONNECTION_TIMEOUT 10000
@@ -37,4 +38,5 @@ typedef struct dtcurl_wrapper {
 
     CURL *curl_handle;
     pthread_t download_pid;
+    int request_quit;
 } dtcurl_wrapper_t;

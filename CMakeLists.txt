@@ -14,6 +14,7 @@ AUX_SOURCE_DIRECTORY(src SRC_CURL)
 #ADD_LIBRARY(dtcurl_shared SHARED ${SRC_CURL})
 ADD_LIBRARY(dtcurl_static STATIC ${SRC_CURL})
 TARGET_LINK_LIBRARIES(dtcurl_static curl)
+TARGET_LINK_LIBRARIES(dtcurl_static pthread)
 
 # target - test
 SET(SRC_TEST test/curl_test.c )

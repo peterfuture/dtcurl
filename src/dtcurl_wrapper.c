@@ -109,7 +109,14 @@ static void curl_download_loop(void *priv)
 int dtcurl_wrapper_start(dtcurl_wrapper_t *wrapper)
 {
     int ret = CURL_ERROR_UNKOWN;
+    pthread_t tid;
     CURL_LOG("create download thread\n");
-    ret = pthread_create(&wrapper->download_pid, curl_download_loop, wrapper);
+    ret = pthread_create(&tid, NULL, curl_download_loop, wrapper);
+    pthread_setname_np(tid, "curl_download_thread");
+    wrapper->download_pid = tid;
+
+    while (wrapper->request_quit == 0) {
+        usleep(100 * 1000);
+    }
     return CURL_ERROR_NONE;
 }
