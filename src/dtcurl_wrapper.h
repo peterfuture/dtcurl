@@ -15,7 +15,26 @@
 
 #include "curl/curl.h"
 
+#include "dtcurl_buffer.h"
+
+#define CURL_MAX_TIMEOUT 10000
+#define CURL_MAX_CONNECTION_TIMEOUT 10000
+#define CURL_MAX_REDIRECTS 10
+
+typedef enum dtcurl_proto {
+    CURL_PROTO_UNKOWN = 0x000,
+    CURL_PROTO_HTTP  = 0x001,
+    CURL_PROTO_HTTPS = 0x002,
+    CURL_PROTO_FTP   = 0x003,
+    CURL_PROTO_FILE  = 0x004
+} dtcurl_proto_t;
+
 typedef struct dtcurl_wrapper {
     char *uri;
+    dtcurl_buffer_t cache;
+    dtcurl_proto_t proto;
+    char curl_error_buf[CURL_ERROR_SIZE];
+
     CURL *curl_handle;
+    pthread_t download_pid;
 } dtcurl_wrapper_t;

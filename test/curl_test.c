@@ -19,7 +19,8 @@
 
 int main(int argc, char **argv)
 {
-    void *curl;
-    dtcurl_init(&curl, "aaa");
+    void *curl_ctx;
+    const char *uri = "http://devimages.apple.com/iphone/samples/bipbop/gear1/prog_index.m3u8";
+    dtcurl_init(&curl_ctx, uri);
     return 0;
 }
