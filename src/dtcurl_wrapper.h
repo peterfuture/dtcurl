@@ -32,11 +32,12 @@ typedef enum dtcurl_proto {
 
 typedef struct dtcurl_wrapper {
     char *uri;
-    dtcurl_buffer_t cache;
     dtcurl_proto_t proto;
     char curl_error_buf[CURL_ERROR_SIZE];
 
+    dtcurl_buffer_t cache;
     CURL *curl_handle;
+    CURLM *multi_handle;
     pthread_t download_pid;
     int request_quit;
 } dtcurl_wrapper_t;
