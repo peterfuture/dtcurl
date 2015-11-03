@@ -30,12 +30,23 @@ typedef enum dtcurl_proto {
     CURL_PROTO_FILE  = 0x004
 } dtcurl_proto_t;
 
+typedef struct http_context {
+    char *location;
+    int http_code;
+    int chunksize;
+    int end_header;
+    int seekable;
+    int64_t filesize;
+    int is_streamed;
+} http_context_t;
+
 typedef struct dtcurl_wrapper {
     char *uri;
     dtcurl_proto_t proto;
     char curl_error_buf[CURL_ERROR_SIZE];
-
     dtcurl_buffer_t cache;
+
+    http_context_t http;
     CURL *curl_handle;
     CURLM *multi_handle;
     pthread_t download_pid;
