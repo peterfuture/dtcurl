@@ -131,7 +131,7 @@ char *dtcurl_asprintf(const char *fmt, ...)
     len = vsnprintf(p, len + 1, fmt, va);
     va_end(va);
     if (len < 0) {
-        dtcurl_free(&p);
+        free(p);
     }
 
 end:

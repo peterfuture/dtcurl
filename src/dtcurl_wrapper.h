@@ -37,6 +37,8 @@ typedef struct http_context {
     int end_header;
     int seekable;
     int64_t filesize;
+    int64_t read_off;
+    int eof;
     int is_streamed;
 } http_context_t;
 
@@ -45,7 +47,6 @@ typedef struct dtcurl_wrapper {
     dtcurl_proto_t proto;
     char curl_error_buf[CURL_ERROR_SIZE];
     dtcurl_buffer_t cache;
-
     http_context_t http;
     CURL *curl_handle;
     CURLM *multi_handle;

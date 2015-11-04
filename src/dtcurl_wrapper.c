@@ -25,11 +25,13 @@
 static size_t write_function(void *buffer, size_t size, size_t nmemb, void *userp)
 {
     dtcurl_wrapper_t *wrapper = (dtcurl_wrapper_t *)userp;
-
-    //CURL_LOG("get data size:%d nmeb:%d\n", size, nmemb);
-    //CURL_LOG("content:%s\n", buffer);
+    http_context_t *http = &wrapper->http;
 
     int total = size * nmemb;
+    if (http->filesize < total + http->read_off) {
+        CURL_LOG("warnning- read too much data. readoff[%" PRId64 "] + total[%d] > filesize[%" PRId64 "]\n", http->read_off, total, http->filesize);
+    }
+
     int space = dtcurl_buf_space(&wrapper->cache);
     while (space < total) {
         usleep(10 * 1000);
@@ -40,6 +42,13 @@ static size_t write_function(void *buffer, size_t size, size_t nmemb, void *user
     if (ret != total) {
         CURL_LOG("Error, write failed. total:%d ret:%d \n", total, ret);
     }
+
+    http->read_off += ret;
+    if (http->read_off >= http->filesize) {
+        CURL_LOG("read finished \n");
+        http->eof = 1;
+    }
+    CURL_LOG("size:%d read_off:%"PRId64" filesize:%"PRId64"\n", total, http->read_off, http->filesize);
     return nmemb * size;
 }
 
@@ -57,11 +66,11 @@ static int process_line(http_context_t *http, char *line)
             ptr++;
         }
         http->http_code = (int)strtol(ptr, NULL, 10);
-        CURL_LOG("response code:%d \n", http->http_code);
+        //CURL_LOG("response code:%d \n", http->http_code);
         return 0;
     }
 
-    if (http->http_code == 200) {
+    if (http->http_code >= 200 && http->http_code < 300) {
         if (!strncasecmp(line, "Content-Length", 14)) {
             while (*ptr != '\0' && *ptr != ':') {
                 ptr++;
@@ -71,6 +80,7 @@ static int process_line(http_context_t *http, char *line)
                 ptr++;
             }
             http->filesize = atoll(ptr);
+            CURL_LOG("get filesize:%"PRId64" \n", http->filesize);
         }
 
         if (!strncasecmp(line, "Content-Range", 13)) {
@@ -84,21 +94,19 @@ static int process_line(http_context_t *http, char *line)
             http->filesize = 0;
             http->chunksize = 0;
         }
-        return 0;
-    }
 
-    if (206 == http->http_code) {
         if (!strncasecmp(line, "Content-Range", 13)) {
             const char * slash = NULL;
             if ((slash = strchr(ptr, '/')) && strlen(slash) > 0) {
                 http->chunksize = atoll(slash + 1);
             }
         }
+
         return 0;
     }
 
     // redirect
-    if (http->http_code > 300 && http->http_code < 400) {
+    if (http->http_code >= 300 && http->http_code < 400) {
         if (!strncasecmp(line, "Location", 8)) {
             while (*ptr != '\0' && *ptr != ':') {
                 ptr++;
@@ -106,6 +114,9 @@ static int process_line(http_context_t *http, char *line)
             ptr++;
             while (isspace(*ptr)) {
                 ptr++;
+            }
+            if (http->location) {
+                free(http->location);
             }
             http->location = strdup(ptr);
         }
@@ -116,7 +127,6 @@ static int process_line(http_context_t *http, char *line)
     if (http->http_code > 400) {
         http->end_header = 1;
         return CURL_ERROR_UNKOWN;
-        //return ERROR;
     }
 
     if (strcasestr(line, "Octoshape-Ondemand")) {
@@ -133,7 +143,7 @@ static size_t header_function(void *buffer, size_t size, size_t nmemb, void *use
     http_context_t *http = &wrapper->http;
     //CURL_LOG("response size:%d nmeb:%d\n", size, nmemb);
     char *line = (char *)buffer;
-    CURL_LOG("process line:%s\n", line);
+    //CURL_LOG("process line:%s\n", line);
     int ret = process_line(http, line);
     if (ret < 0) {
         return ret;
@@ -148,86 +158,38 @@ static int curl_wrapper_setopt(dtcurl_wrapper_t *wrapper)
         return ret;
     }
     CURLcode code;
-#if 0
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_ERRORBUFFER, wrapper->curl_error_buf);
-    if (code != CURLE_OK) {
-        CURL_LOG("curl easy setopt CURLOPT_ERRORBUFFER failed \n");
-        return ret;
-    }
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_CONNECTTIMEOUT, CURL_MAX_CONNECTION_TIMEOUT);
-#endif
-#if 0
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_BUFFERSIZE, CURL_MAX_TIMEOUT);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_FORBID_REUSE, 1L);
-#endif
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_URL, wrapper->uri);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_MAXREDIRS, CURL_MAX_REDIRECTS);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_WRITEFUNCTION, write_function);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_WRITEDATA, (void *)wrapper);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_HEADERFUNCTION, header_function);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_WRITEHEADER, (void *)wrapper);
-
-    //curl_easy_setopt(wrapper->curl_handle, CURLOPT_VERBOSE, 1L);
-    //curl_easy_setopt(wrapper->curl_handle, CURLOPT_DEBUGFUNCTION, debug_function);
-    curl_easy_setopt(wrapper->curl_handle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
-    curl_easy_setopt(wrapper->curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(wrapper->curl_handle, CURLOPT_SSL_VERIFYHOST, 0L);
-    curl_multi_setopt(wrapper->curl_handle, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
-    curl_easy_setopt(wrapper->curl_handle, CURLOPT_PIPEWAIT, 1L);
+    code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_VERBOSE, 1L);
+    //code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_DEBUGFUNCTION, debug_function);
+    code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
+    code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
+    code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_SSL_VERIFYHOST, 0L);
+    code = curl_multi_setopt(wrapper->curl_handle, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
+    code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_PIPEWAIT, 1L);
+    if (code != CURLE_OK) {
+        CURL_LOG("curl easy setopt failed \n");
+        return ret;
+    }
     CURL_LOG("curl easy setopt success \n");
     return CURL_ERROR_NONE;
 }
 
-int dtcurl_wrapper_init(dtcurl_wrapper_t *wrapper, const char *uri)
-{
-    int ret = CURL_ERROR_NONE;
-    memset(wrapper, 0, sizeof(dtcurl_wrapper_t));
-    wrapper->uri = strdup(uri);
-    wrapper->multi_handle = curl_multi_init();
-    if (!wrapper->multi_handle) {
-        CURL_LOG("curl multi init failed \n");
-        return CURL_ERROR_UNKOWN;
-    }
-    wrapper->curl_handle = curl_easy_init();
-    if (!wrapper->curl_handle) {
-        CURL_LOG("curl easy init failed \n");
-        return CURL_ERROR_UNKOWN;
-    }
-
-    ret = dtcurl_buf_init(&wrapper->cache, CURL_MAX_CACHE_SIZE);
-    if (ret < 0) {
-        CURL_LOG("dtcurl cache init failed \n");
-        return ret;
-    }
-
-    // protocal check
-    if (dtcurl_stristart(uri, "http://", NULL)) {
-        wrapper->proto = CURL_PROTO_HTTP;
-    } else if (dtcurl_stristart(uri, "httpis://", NULL)) {
-        wrapper->proto = CURL_PROTO_HTTPS;
-    }
-
-    if (wrapper->proto == CURL_PROTO_HTTP || wrapper->proto == CURL_PROTO_HTTPS) {
-        ret = curl_wrapper_setopt(wrapper);
-        if (ret < 0) {
-            return ret;
-        }
-    } else {
-        CURL_LOG("Protocal not support yet \n");
-        return CURL_ERROR_UNKOWN;
-    }
-
-    return CURL_ERROR_NONE;
-}
-
-static void curl_download_loop(void *priv)
+static void* curl_download_loop(void *priv)
 {
     CURL_LOG("download loop enter\n");
     dtcurl_wrapper_t *wrapper = (dtcurl_wrapper_t *)priv;
-    //curl_easy_perform(wrapper->curl_handle);
     CURLcode code = curl_multi_add_handle(wrapper->multi_handle, wrapper->curl_handle);
     if (code != CURLM_OK) {
-        return CURL_ERROR_UNKOWN;
+        return NULL;
     }
     int running_handle_cnt = 0;
     int select_zero_cnt = 0;
@@ -236,6 +198,9 @@ static void curl_download_loop(void *priv)
     curl_multi_perform(wrapper->multi_handle, &running_handle_cnt);
     CURL_LOG("handle cnt:%d \n", running_handle_cnt);
     while (running_handle_cnt) {
+        if (wrapper->request_quit) {
+            break;
+        }
         struct timeval tv;
         tv.tv_sec = 0;
         tv.tv_usec = 200 * 1000;
@@ -298,7 +263,7 @@ static void curl_download_loop(void *priv)
 
     if (select_breakout_flag) {
         CURL_LOG("select breakout\n");
-        return CURL_ERROR_SELECT_ERROR;
+        return NULL;
     }
 
     int msgs_left;
@@ -315,7 +280,7 @@ static void curl_download_loop(void *priv)
             char * info = NULL;
             retcode = curl_easy_getinfo(wrapper->curl_handle, CURLINFO_RESPONSE_CODE, (long *)(&info));
             if (CURLE_OK == retcode) {
-                CURL_LOG("response_code: [%ld]\n", info);
+                CURL_LOG("response_code: [%s]\n", info);
             }
             double speed = 0.0;
             retcode = curl_easy_getinfo(wrapper->curl_handle, CURLINFO_SPEED_DOWNLOAD, (double *)&speed);
@@ -327,10 +292,37 @@ static void curl_download_loop(void *priv)
     CURL_LOG("download loop exit ret:%d\n", ret);
 }
 
-int dtcurl_wrapper_start(dtcurl_wrapper_t *wrapper)
+static int http_open_cnt(dtcurl_wrapper_t *wrapper)
 {
-    int ret = CURL_ERROR_UNKOWN;
     pthread_t tid;
+    int ret = -1;
+    http_context_t *http = &wrapper->http;
+    if (http->location) {
+        free(http->location);
+        http->location = NULL;
+    }
+    if (!wrapper->multi_handle) {
+        wrapper->multi_handle = curl_multi_init();
+    }
+    if (!wrapper->multi_handle) {
+        CURL_LOG("curl multi init failed \n");
+        return CURL_ERROR_UNKOWN;
+    }
+    if (!wrapper->curl_handle) {
+        wrapper->curl_handle = curl_easy_init();
+    }
+    if (!wrapper->curl_handle) {
+        CURL_LOG("curl easy init failed \n");
+        return CURL_ERROR_UNKOWN;
+    }
+
+    if (wrapper->proto == CURL_PROTO_HTTP || wrapper->proto == CURL_PROTO_HTTPS) {
+        ret = curl_wrapper_setopt(wrapper);
+        if (ret < 0) {
+            return ret;
+        }
+    }
+
     CURL_LOG("create download thread\n");
     ret = pthread_create(&tid, NULL, curl_download_loop, wrapper);
     pthread_setname_np(tid, "curl_download_thread");
@@ -338,14 +330,53 @@ int dtcurl_wrapper_start(dtcurl_wrapper_t *wrapper)
     return CURL_ERROR_NONE;
 }
 
+static int http_open(dtcurl_wrapper_t *wrapper)
+{
+    http_context_t *http = &wrapper->http;
+    http->location = NULL;
+    http->http_code = -1;
+    http->chunksize = -1;
+    http->end_header = 0;
+    http->filesize = 0;
+    http->read_off = -1;
+    http->eof = 0;
+    http->is_streamed = -1;
+    return http_open_cnt(wrapper);
+}
+
+int dtcurl_wrapper_open(dtcurl_wrapper_t *wrapper, const char *uri)
+{
+    int ret = CURL_ERROR_NONE;
+    memset(wrapper, 0, sizeof(dtcurl_wrapper_t));
+    wrapper->uri = strdup(uri);
+    ret = dtcurl_buf_init(&wrapper->cache, CURL_MAX_CACHE_SIZE);
+    if (ret < 0) {
+        CURL_LOG("dtcurl cache init failed \n");
+        return ret;
+    }
+    // protocal check
+    if (dtcurl_stristart(uri, "http://", NULL)) {
+        wrapper->proto = CURL_PROTO_HTTP;
+    } else if (dtcurl_stristart(uri, "httpis://", NULL)) {
+        wrapper->proto = CURL_PROTO_HTTPS;
+    }
+
+    return http_open(wrapper);
+}
+
 int dtcurl_wrapper_read(dtcurl_wrapper_t *wrapper, char *buf, int size)
 {
+    http_context_t *http = &wrapper->http;
     int level = dtcurl_buf_level(&wrapper->cache);
     int rsize = CURL_MIN(size, level);
     if (rsize > 0) {
-        dtcurl_buf_get(&wrapper->cache, buf, rsize);
+        rsize = dtcurl_buf_get(&wrapper->cache, buf, rsize);
     }
-    CURL_LOG("read rsize:%d level:%d size:%d\n", rsize, level, size);
+
+    if (rsize == 0 && http->eof == 1) {
+        return -1;
+    }
+    //CURL_LOG("read rsize:%d level:%d size:%d\n", rsize, level, size);
     return rsize;
 }
 

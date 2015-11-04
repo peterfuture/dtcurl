@@ -20,8 +20,8 @@
 int main(int argc, char **argv)
 {
     void *curl_ctx;
-    //const char *uri = "http://devimages.apple.com/iphone/samples/bipbop/gear1/prog_index.m3u8";
-    const char *uri = "http://www.modrails.com/videos/passenger_nginx.mov";
+    const char *uri = "http://devimages.apple.com/iphone/samples/bipbop/gear1/prog_index.m3u8";
+    //const char *uri = "http://www.modrails.com/videos/passenger_nginx.mov";
     dtcurl_init(&curl_ctx, uri);
 
     char buf[1024];
@@ -31,7 +31,12 @@ int main(int argc, char **argv)
         if (ret > 0) {
             printf("read %d bytes \n", ret);
         }
+
+        if (ret < 0) {
+            break;
+        }
         usleep(10000);
     }
+    printf("test end \n");
     return 0;
 }

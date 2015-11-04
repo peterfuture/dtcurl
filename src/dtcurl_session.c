@@ -24,16 +24,10 @@ int dtcurl_session_open(dtcurl_session_t *session, const char *uri)
     session->uri = strdup(uri);
     CURL_LOG("hls url:%s \n", session->uri);
 
-    ret = dtcurl_wrapper_init(&session->dtcurl_wrapper, uri);
+    ret = dtcurl_wrapper_open(&session->dtcurl_wrapper, uri);
     if (ret < 0) {
         return ret;
     }
-
-    ret = dtcurl_wrapper_start(&session->dtcurl_wrapper);
-    if (ret < 0) {
-        return ret;
-    }
-
     CURL_LOG("dtcurl session open success \n");
     return CURL_ERROR_NONE;
 }
