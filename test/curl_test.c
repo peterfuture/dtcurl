@@ -23,5 +23,15 @@ int main(int argc, char **argv)
     //const char *uri = "http://devimages.apple.com/iphone/samples/bipbop/gear1/prog_index.m3u8";
     const char *uri = "http://www.modrails.com/videos/passenger_nginx.mov";
     dtcurl_init(&curl_ctx, uri);
+
+    char buf[1024];
+    int ret = 0;
+    while (1) {
+        ret = dtcurl_read(curl_ctx, buf, 1024);
+        if (ret > 0) {
+            printf("read %d bytes \n", ret);
+        }
+        usleep(10000);
+    }
     return 0;
 }

@@ -18,7 +18,7 @@ int dtcurl_buf_init(dtcurl_buffer_t * dbt, int size)
     dbt->level = 0;
     dbt->rd_ptr = dbt->wr_ptr = dbt->data;
     dtcurl_lock_init(&dbt->mutex, NULL);
-    CURL_LOG("DTBUF INIT OK\n");
+    CURL_LOG("DTBUF INIT OK size:%d\n", size);
     return 0;
 }
 

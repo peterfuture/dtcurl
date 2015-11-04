@@ -26,3 +26,9 @@ int dtcurl_init(void **priv, const char *uri)
     *priv = session;
     return 0;
 }
+
+int dtcurl_read(void *priv, char *buf, int size)
+{
+    dtcurl_session_t *session = (dtcurl_session_t *)priv;
+    return dtcurl_session_read(session, buf, size);
+}

@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "dtcurl_wrapper.h"
 #include "dtcurl_log.h"
@@ -25,9 +26,20 @@ static size_t write_function(void *buffer, size_t size, size_t nmemb, void *user
 {
     dtcurl_wrapper_t *wrapper = (dtcurl_wrapper_t *)userp;
 
-    CURL_LOG("get data size:%d nmeb:%d\n", size, nmemb);
+    //CURL_LOG("get data size:%d nmeb:%d\n", size, nmemb);
     //CURL_LOG("content:%s\n", buffer);
 
+    int total = size * nmemb;
+    int space = dtcurl_buf_space(&wrapper->cache);
+    while (space < total) {
+        usleep(10 * 1000);
+        CURL_LOG("space:%d total:%d\n", space, total);
+    }
+
+    int ret = dtcurl_buf_put(&wrapper->cache, buffer, total);
+    if (ret != total) {
+        CURL_LOG("Error, write failed. total:%d ret:%d \n", total, ret);
+    }
     return nmemb * size;
 }
 
@@ -151,9 +163,9 @@ static int curl_wrapper_setopt(dtcurl_wrapper_t *wrapper)
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_URL, wrapper->uri);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_MAXREDIRS, CURL_MAX_REDIRECTS);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_WRITEFUNCTION, write_function);
-    code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_WRITEDATA, &wrapper);
+    code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_WRITEDATA, (void *)wrapper);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_HEADERFUNCTION, header_function);
-    code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_WRITEHEADER, &wrapper);
+    code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_WRITEHEADER, (void *)wrapper);
 
     //curl_easy_setopt(wrapper->curl_handle, CURLOPT_VERBOSE, 1L);
     //curl_easy_setopt(wrapper->curl_handle, CURLOPT_DEBUGFUNCTION, debug_function);
@@ -323,8 +335,21 @@ int dtcurl_wrapper_start(dtcurl_wrapper_t *wrapper)
     ret = pthread_create(&tid, NULL, curl_download_loop, wrapper);
     pthread_setname_np(tid, "curl_download_thread");
     wrapper->download_pid = tid;
-    while (!wrapper->request_quit) {
-        usleep(100 * 1000);
+    return CURL_ERROR_NONE;
+}
+
+int dtcurl_wrapper_read(dtcurl_wrapper_t *wrapper, char *buf, int size)
+{
+    int level = dtcurl_buf_level(&wrapper->cache);
+    int rsize = CURL_MIN(size, level);
+    if (rsize > 0) {
+        dtcurl_buf_get(&wrapper->cache, buf, rsize);
     }
+    CURL_LOG("read rsize:%d level:%d size:%d\n", rsize, level, size);
+    return rsize;
+}
+
+int dtcurl_wrapper_seek(dtcurl_wrapper_t *wrapper, int64_t pos, int whence)
+{
     return CURL_ERROR_NONE;
 }

@@ -12,7 +12,7 @@
 #define CURL_MAX(x,y)       ((x)>(y)?(x):(y))
 
 #define MAX_URI_SIZE 4096
-#define CURL_MAX_CACHE_SIZE 10*1024*1024
+#define CURL_MAX_CACHE_SIZE (10*1024*1024)
 
 #define CURL_MAX_SELECT_RETRY_TIME 100
 
