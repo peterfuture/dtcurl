@@ -15,7 +15,7 @@
  */
 
 #include <stdio.h>
-#include "dtcurl_priv.h"
+#include "dtcurl_api.h"
 
 int main(int argc, char **argv)
 {
