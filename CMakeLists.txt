@@ -4,6 +4,8 @@ cmake_minimum_required (VERSION 2.8)
 # project
 project (dtcurl)
 
+LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}")
+
 # Library dependence
 FIND_PACKAGE(CURL  REQUIRED)
 INCLUDE_DIRECTORIES(${CURL_INCLUDE_DIR})
