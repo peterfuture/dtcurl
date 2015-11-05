@@ -45,12 +45,12 @@ int dtcurl_session_seek(dtcurl_session_t *session, int64_t pos, int whence)
 
 int dtcurl_session_close(dtcurl_session_t *session)
 {
+    CURL_LOG("dtcurl session close\n");
     if (!session) {
         return CURL_ERROR_UNKOWN;
     }
     if (session->uri) {
         free(session->uri);
     }
-    CURL_LOG("dtcurl session closed \n");
-    return CURL_ERROR_NONE;
+    return dtcurl_wrapper_close(&session->dtcurl_wrapper);
 }

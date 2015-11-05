@@ -32,3 +32,17 @@ int dtcurl_read(void *priv, char *buf, int size)
     dtcurl_session_t *session = (dtcurl_session_t *)priv;
     return dtcurl_session_read(session, buf, size);
 }
+
+int dtcurl_seek(void *priv, int64_t off, int whence)
+{
+    dtcurl_session_t *session = (dtcurl_session_t *)priv;
+    return dtcurl_session_seek(session, off, whence);
+}
+
+int dtcurl_close(void *priv)
+{
+    dtcurl_session_t *session = (dtcurl_session_t *)priv;
+    dtcurl_session_close(session);
+    free(session);
+    return CURL_ERROR_NONE;
+}

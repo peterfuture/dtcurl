@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "dtcurl_wrapper.h"
 #include "dtcurl_log.h"
@@ -30,6 +31,7 @@ static size_t write_function(void *buffer, size_t size, size_t nmemb, void *user
     int total = size * nmemb;
     if (http->filesize < total + http->read_off) {
         CURL_LOG("warnning- read too much data. readoff[%" PRId64 "] + total[%d] > filesize[%" PRId64 "]\n", http->read_off, total, http->filesize);
+        total = http->filesize - http->read_off;
     }
 
     int space = dtcurl_buf_space(&wrapper->cache);
@@ -79,8 +81,10 @@ static int process_line(http_context_t *http, char *line)
             while (isspace(*ptr)) {
                 ptr++;
             }
-            http->filesize = atoll(ptr);
-            CURL_LOG("get filesize:%"PRId64" \n", http->filesize);
+            if (http->filesize < 0) {
+                http->filesize = atoll(ptr);
+                CURL_LOG("get filesize:%"PRId64" \n", http->filesize);
+            }
         }
 
         if (!strncasecmp(line, "Content-Range", 13)) {
@@ -323,6 +327,11 @@ static int http_open_cnt(dtcurl_wrapper_t *wrapper)
         }
     }
 
+    // For seek or resume case
+    if (http->read_off > 0) {
+        ret = curl_easy_setopt(wrapper->curl_handle, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)http->read_off);
+    }
+
     CURL_LOG("create download thread\n");
     ret = pthread_create(&tid, NULL, curl_download_loop, wrapper);
     pthread_setname_np(tid, "curl_download_thread");
@@ -337,9 +346,9 @@ static int http_open(dtcurl_wrapper_t *wrapper)
     http->http_code = -1;
     http->chunksize = -1;
     http->end_header = 0;
-    http->filesize = 0;
+    http->filesize = -1;
     http->read_off = -1;
-    http->eof = 0;
+    http->eof = -1;
     http->is_streamed = -1;
     return http_open_cnt(wrapper);
 }
@@ -380,7 +389,80 @@ int dtcurl_wrapper_read(dtcurl_wrapper_t *wrapper, char *buf, int size)
     return rsize;
 }
 
-int dtcurl_wrapper_seek(dtcurl_wrapper_t *wrapper, int64_t pos, int whence)
+//ffmpeg support
+#define AV_SEEKSIZE 0x10000
+int dtcurl_wrapper_seek(dtcurl_wrapper_t *wrapper, int64_t off, int whence)
 {
+    http_context_t *http = &wrapper->http;
+    CURL_LOG("seekto off:%"PRId64"\n", off);
+    if (whence == AV_SEEKSIZE) {
+        return http->filesize;
+    }
+    if ((whence == SEEK_CUR && off == 0) || ((whence == SEEK_SET && off == http->read_off))) {
+        return http->read_off;
+    }
+
+    if ((whence == SEEK_END && http->filesize == -1) || http->is_streamed > 0) {
+        return CURLERROR(ENOSYS);
+    }
+    if (whence == SEEK_CUR) {
+        off += http->read_off;
+    } else if (whence == SEEK_END) {
+        off += http->filesize;
+    } else if (whence != SEEK_SET) {
+        return CURLERROR(EINVAL);
+    }
+    if (off < 0) {
+        return CURLERROR(EINVAL);
+    }
+    http->read_off = off;
+
+    // quit thread
+    wrapper->request_quit = 1;
+    pthread_join(wrapper->download_pid, NULL);
+
+    // reset cache
+    dtcurl_buf_reinit(&wrapper->cache);
+
+    // cleanup curl handle
+    if (wrapper->multi_handle) {
+        curl_multi_cleanup(wrapper->multi_handle);
+        wrapper->multi_handle = NULL;
+    }
+    if (wrapper->curl_handle) {
+        curl_easy_cleanup(wrapper->curl_handle);
+        wrapper->curl_handle = NULL;
+    }
+    CURL_LOG("seek end \n");
+    wrapper->request_quit = 0;
+    return http_open_cnt(wrapper);
+}
+
+int dtcurl_wrapper_close(dtcurl_wrapper_t *wrapper)
+{
+    http_context_t *http = &wrapper->http;
+
+    // quit thread
+    wrapper->request_quit = 1;
+    pthread_join(wrapper->download_pid, NULL);
+
+    // reset cache
+    dtcurl_buf_reinit(&wrapper->cache);
+
+    // cleanup curl handle
+    if (wrapper->multi_handle) {
+        curl_multi_cleanup(wrapper->multi_handle);
+        wrapper->multi_handle = NULL;
+    }
+    if (wrapper->curl_handle) {
+        curl_easy_cleanup(wrapper->curl_handle);
+        wrapper->curl_handle = NULL;
+    }
+    if (wrapper->uri) {
+        free(wrapper->uri);
+    }
+    if (http->location) {
+        free(http->location);
+    }
     return CURL_ERROR_NONE;
 }

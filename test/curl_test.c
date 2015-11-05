@@ -26,10 +26,14 @@ int main(int argc, char **argv)
 
     char buf[1024];
     int ret = 0;
+    int count = 2;
     while (1) {
         ret = dtcurl_read(curl_ctx, buf, 1024);
         if (ret > 0) {
             printf("read %d bytes \n", ret);
+            if (count-- < 0) {
+                break;
+            }
         }
 
         if (ret < 0) {
@@ -37,6 +41,24 @@ int main(int argc, char **argv)
         }
         usleep(10000);
     }
+
+    dtcurl_seek(curl_ctx, 20, SEEK_SET);
+    while (1) {
+        ret = dtcurl_read(curl_ctx, buf, 1024);
+        if (ret > 0) {
+            printf("read %d bytes \n", ret);
+            if (count-- < 0) {
+                break;
+            }
+        }
+
+        if (ret < 0) {
+            break;
+        }
+        usleep(10000);
+    }
+
+    dtcurl_close(curl_ctx);
     printf("test end \n");
     return 0;
 }

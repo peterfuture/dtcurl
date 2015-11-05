@@ -17,6 +17,8 @@
 #define CURL_MAX_SELECT_RETRY_TIME 100
 
 // Return Value
+#define CURLERROR(e) (-(e))
+
 #define CURL_ERROR_SELECT_ERROR -2
 #define CURL_ERROR_UNKOWN -1
 #define CURL_ERROR_NONE 0
