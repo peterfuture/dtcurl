@@ -347,7 +347,7 @@ static int http_open(dtcurl_wrapper_t *wrapper)
     http->chunksize = -1;
     http->end_header = 0;
     http->filesize = -1;
-    http->read_off = -1;
+    http->read_off = 0;
     http->eof = -1;
     http->is_streamed = -1;
     return http_open_cnt(wrapper);
