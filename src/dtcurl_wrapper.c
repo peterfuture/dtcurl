@@ -438,6 +438,18 @@ int dtcurl_wrapper_seek(dtcurl_wrapper_t *wrapper, int64_t off, int whence)
     return http_open_cnt(wrapper);
 }
 
+int dtcurl_wrapper_get_filesize(dtcurl_wrapper_t *wrapper)
+{
+    http_context_t *http = &wrapper->http;
+    return http->filesize;
+}
+
+const char *dtcurl_wrapper_get_location(dtcurl_wrapper_t *wrapper)
+{
+    http_context_t *http = &wrapper->http;
+    return http->location;
+}
+
 int dtcurl_wrapper_close(dtcurl_wrapper_t *wrapper)
 {
     http_context_t *http = &wrapper->http;

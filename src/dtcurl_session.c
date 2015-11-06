@@ -16,6 +16,7 @@
 
 #include <stdio.h>
 #include "dtcurl_priv.h"
+#include "dtcurl_wrapper.h"
 
 int dtcurl_session_open(dtcurl_session_t *session, const char *uri)
 {
@@ -41,6 +42,16 @@ int dtcurl_session_read(dtcurl_session_t *session, char *buf, int size)
 int dtcurl_session_seek(dtcurl_session_t *session, int64_t pos, int whence)
 {
     return dtcurl_wrapper_seek(&session->dtcurl_wrapper, pos, whence);
+}
+
+int dtcurl_session_get_filesize(dtcurl_session_t *session)
+{
+    return dtcurl_wrapper_get_filesize(&session->dtcurl_wrapper);
+}
+
+const char *dtcurl_session_get_location(dtcurl_session_t *session)
+{
+    return dtcurl_wrapper_get_location(&session->dtcurl_wrapper);
 }
 
 int dtcurl_session_close(dtcurl_session_t *session)

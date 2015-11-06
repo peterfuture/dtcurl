@@ -13,6 +13,9 @@
  * =====================================================================================
  */
 
+#ifndef DTCURL_WRAPPER_H
+#define DTCURL_WRAPPER_H
+
 #include "curl/curl.h"
 
 #include "dtcurl_buffer.h"
@@ -53,3 +56,13 @@ typedef struct dtcurl_wrapper {
     pthread_t download_pid;
     int request_quit;
 } dtcurl_wrapper_t;
+
+
+int dtcurl_wrapper_open(dtcurl_wrapper_t *wrapper, const char *uri);
+int dtcurl_wrapper_read(dtcurl_wrapper_t *wrapper, char *buf, int size);
+int dtcurl_wrapper_seek(dtcurl_wrapper_t *wrapper, int64_t off, int whence);
+int dtcurl_wrapper_get_filesize(dtcurl_wrapper_t *wrapper);
+const char *dtcurl_wrapper_get_location(dtcurl_wrapper_t *wrapper);
+int dtcurl_wrapper_close(dtcurl_wrapper_t *wrapper);
+
+#endif

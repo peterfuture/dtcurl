@@ -31,4 +31,4 @@ INSTALL(TARGETS dtcurl
     ARCHIVE DESTINATION lib
     )
 
-install(DIRECTORY include/ DESTINATION /usr/local/include/${PROJECT_NAME})
+INSTALL(DIRECTORY include/ DESTINATION /usr/local/include/${PROJECT_NAME})

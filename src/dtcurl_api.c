@@ -15,6 +15,8 @@
  */
 
 #include "dtcurl_priv.h"
+#include "dtcurl_session.h"
+#include "dtcurl_api.h"
 
 int dtcurl_init(void **priv, const char *uri)
 {
@@ -37,6 +39,30 @@ int dtcurl_seek(void *priv, int64_t off, int whence)
 {
     dtcurl_session_t *session = (dtcurl_session_t *)priv;
     return dtcurl_session_seek(session, off, whence);
+}
+
+int dtcurl_set_parameter(void *priv, int key, void *value)
+{
+    dtcurl_session_t *session = (dtcurl_session_t *)priv;
+    switch (key) {
+    default:
+        break;
+    }
+    return CURL_ERROR_NONE;
+}
+
+int dtcurl_get_parameter(void *priv, int key, void *value)
+{
+    dtcurl_session_t *session = (dtcurl_session_t *)priv;
+    switch (key) {
+    case KEY_CURL_GET_FILESIZE:
+        *(int64_t *)value = dtcurl_session_get_filesize(session);
+        break;
+    case KEY_CURL_GET_LOCATION:
+        *(char **)value = strdup(dtcurl_session_get_location(session));
+        break;
+    }
+    return CURL_ERROR_NONE;
 }
 
 int dtcurl_close(void *priv)
