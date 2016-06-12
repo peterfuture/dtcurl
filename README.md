@@ -7,6 +7,10 @@ download module for dthls. curl wrapper.
 - make
 - sudo make install
 
+## How to use
+
+read header file under include and ref to sample code under test
+
 ## Links
 
 - [dthls](https://github.com/peterfuture/dthls)
