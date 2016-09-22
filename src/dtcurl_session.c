@@ -39,7 +39,6 @@ int dtcurl_session_read(dtcurl_session_t *session, char *buf, int size)
     return dtcurl_wrapper_read(&session->dtcurl_wrapper, buf, size);
 }
 
-
 int64_t dtcurl_session_seek(dtcurl_session_t *session, int64_t pos, int whence)
 {
     return dtcurl_wrapper_seek(&session->dtcurl_wrapper, pos, whence);

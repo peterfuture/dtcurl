@@ -55,7 +55,7 @@ static size_t write_function(void *buffer, size_t size, size_t nmemb, void *user
         CURL_LOG("read finished \n");
         http->eof = 1;
     }
-    CURL_LOG("size:%"PRId64" read_off:%"PRId64" filesize:%"PRId64"\n", total, http->read_off, http->filesize);
+    //CURL_LOG("size:%"PRId64" read_off:%"PRId64" filesize:%"PRId64"\n", total, http->read_off, http->filesize);
     return nmemb * size;
 }
 
@@ -132,6 +132,7 @@ static int process_line(http_context_t *http, char *line)
                 free(http->location);
             }
             http->location = strdup(ptr);
+            CURL_LOG("Got redirect url: %s \n", http->location);
         }
         return 0;
     }
@@ -140,6 +141,7 @@ static int process_line(http_context_t *http, char *line)
     if (http->http_code > 400 && http->http_code < 600) {
         http->end_header = 1;
         http->open_quit = 1;
+        CURL_LOG("CURL Got Error:%d \n", http->http_code);
         return CURL_ERROR_UNKOWN;
     }
 
@@ -184,6 +186,7 @@ static int curl_wrapper_setopt(dtcurl_wrapper_t *wrapper)
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_WRITEHEADER, (void *)wrapper);
     //code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_VERBOSE, 1L);
     //code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_DEBUGFUNCTION, debug_function);
+    code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_FOLLOWLOCATION, 1L);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_SSL_VERIFYHOST, 0L);
@@ -211,65 +214,47 @@ static void* curl_download_loop(void *priv)
 
     curl_multi_perform(wrapper->multi_handle, &running_handle_cnt);
     CURL_LOG("handle cnt:%d \n", running_handle_cnt);
-    while (running_handle_cnt) {
+    while (running_handle_cnt > 0) {
         if (wrapper->request_quit) {
             break;
         }
-        struct timeval tv;
-        tv.tv_sec = 0;
-        tv.tv_usec = 200 * 1000;
 
         struct timeval timeout;
-        int rc;
-        CURLMcode mc;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 100 * 1000;
+
+        int maxfd = -1;
         fd_set fdread;
         fd_set fdwrite;
         fd_set fdexcept;
-        int maxfd = -1;
-
-        long curl_timeo = -1;
-
         FD_ZERO(&fdread);
         FD_ZERO(&fdwrite);
         FD_ZERO(&fdexcept);
 
-        timeout.tv_sec = 1;
-        timeout.tv_usec = 0;
-
-        curl_multi_timeout(wrapper->multi_handle, &curl_timeo);
-        if (curl_timeo >= 0) {
-            timeout.tv_sec = curl_timeo / 1000;
-            if (timeout.tv_sec > 1) {
-                timeout.tv_sec = 1;
-            } else {
-                timeout.tv_usec = (curl_timeo % 1000) * 1000;
-            }
-        }
-
-        mc = curl_multi_fdset(wrapper->multi_handle, &fdread, &fdwrite, &fdexcept, &maxfd);
-
+        CURLMcode mc = curl_multi_fdset(wrapper->multi_handle, &fdread, &fdwrite, &fdexcept, &maxfd);
         if (mc != CURLM_OK) {
             CURL_LOG("curl_multi_fdset() failed, code %d.\n", mc);
             break;
         }
 
-        rc = select(maxfd + 1, &fdread, &fdwrite, &fdexcept, &timeout);
+        int rc = select(maxfd + 1, &fdread, &fdwrite, &fdexcept, &timeout);
         switch (rc) {
         case -1:
             CURL_LOG("select error!\n");
             break;
         case 0:
-            //select_zero_cnt++;
-            //CURL_LOG("select return 0 cnt:%d running_handle:%d \n", select_zero_cnt, running_handle_cnt);
-            //break;
+            select_zero_cnt++;
+            //CURL_LOG("[%s:%d]select return 0 cnt:%d running_handle:%d \n", __FUNCTION__, __LINE__, select_zero_cnt, running_handle_cnt);
+            break;
         default:
             select_zero_cnt = 0;
-            curl_multi_perform(wrapper->multi_handle, &running_handle_cnt);
-            CURL_LOG("runing_handle_count : %d rc:%d\n", running_handle_cnt, rc);
+            while (CURLM_CALL_MULTI_PERFORM == curl_multi_perform(wrapper->multi_handle, &running_handle_cnt)) {
+                CURL_LOG("[%s:%d]runing_handle_count : %d rc:%d\n", __FUNCTION__, __LINE__, running_handle_cnt, rc);
+            }
             break;
         }
-        CURL_LOG("select cnt:%d running_handle:%d\n", select_zero_cnt, running_handle_cnt);
         if (select_zero_cnt == CURL_MAX_SELECT_RETRY_TIME) {
+            CURL_LOG("select cnt:%d running_handle:%d\n", select_zero_cnt, running_handle_cnt);
             select_breakout_flag = 1;
             break;
         }
@@ -386,7 +371,6 @@ int dtcurl_wrapper_open(dtcurl_wrapper_t *wrapper, const char *uri)
         wrapper->proto = CURL_PROTO_HTTPS;
     }
 
-    CURL_LOG("[wrapper:%p] - fuck\n", wrapper);
     return http_open(wrapper);
 }
 
