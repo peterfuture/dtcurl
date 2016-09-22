@@ -7,16 +7,24 @@ project (dtcurl)
 LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}")
 
 # Library dependence
-FIND_PACKAGE(CURL  REQUIRED)
-INCLUDE_DIRECTORIES(${CURL_INCLUDE_DIR})
-
+if(BUILD_FOR_ANDROID)
+    #setup curl android env
+else()
+    FIND_PACKAGE(CURL  REQUIRED)
+    INCLUDE_DIRECTORIES(${CURL_INCLUDE_DIR})
+endif()
 # Target - libdtcurl.so
 INCLUDE_DIRECTORIES(include)
 INCLUDE_DIRECTORIES(src)
 AUX_SOURCE_DIRECTORY(src SRC_CURL)
 ADD_LIBRARY(dtcurl SHARED ${SRC_CURL})
 TARGET_LINK_LIBRARIES(dtcurl curl)
-TARGET_LINK_LIBRARIES(dtcurl pthread)
+
+if(BUILD_FOR_ANDROID)
+    MESSAGE("Android pthread prebuild to libc")
+else()
+    TARGET_LINK_LIBRARIES(dtcurl pthread)
+endif()
 
 # Target - test
 INCLUDE_DIRECTORIES(include)
@@ -25,10 +33,13 @@ ADD_EXECUTABLE(test test/curl_test.c)
 TARGET_LINK_LIBRARIES(test dtcurl)
 
 
-INSTALL(TARGETS dtcurl
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    )
-
+if(BUILD_FOR_ANDROID)
+    MESSAGE("Android Can Not Install")
+else()
+    INSTALL(TARGETS dtcurl
+        #RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        )
 INSTALL(DIRECTORY include/ DESTINATION /usr/local/include/${PROJECT_NAME})
+endif()

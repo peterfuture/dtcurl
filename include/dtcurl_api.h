@@ -29,7 +29,7 @@ enum keys {
 
 int dtcurl_init(void **priv, const char *uri);
 int dtcurl_read(void *priv, char *buf, int size);
-int dtcurl_seek(void *priv, int64_t off, int whence);
+int64_t dtcurl_seek(void *priv, int64_t off, int whence);
 int dtcurl_set_parameter(void *priv, int key, void *value);
 int dtcurl_get_parameter(void *priv, int key, void *value);
 int dtcurl_close(void *priv);

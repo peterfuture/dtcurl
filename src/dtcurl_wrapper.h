@@ -43,6 +43,7 @@ typedef struct http_context {
     int64_t read_off;
     int eof;
     int is_streamed;
+    int open_quit;
 } http_context_t;
 
 typedef struct dtcurl_wrapper {
@@ -60,8 +61,8 @@ typedef struct dtcurl_wrapper {
 
 int dtcurl_wrapper_open(dtcurl_wrapper_t *wrapper, const char *uri);
 int dtcurl_wrapper_read(dtcurl_wrapper_t *wrapper, char *buf, int size);
-int dtcurl_wrapper_seek(dtcurl_wrapper_t *wrapper, int64_t off, int whence);
-int dtcurl_wrapper_get_filesize(dtcurl_wrapper_t *wrapper);
+int64_t dtcurl_wrapper_seek(dtcurl_wrapper_t *wrapper, int64_t off, int whence);
+int64_t dtcurl_wrapper_get_filesize(dtcurl_wrapper_t *wrapper);
 const char *dtcurl_wrapper_get_location(dtcurl_wrapper_t *wrapper);
 int dtcurl_wrapper_close(dtcurl_wrapper_t *wrapper);
 

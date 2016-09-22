@@ -15,4 +15,5 @@
 
 #include <stdio.h>
 
+//#define CURL_LOG
 #define CURL_LOG printf

@@ -24,8 +24,11 @@ int main(int argc, char **argv)
     //const char *uri = "http://www.modrails.com/videos/passenger_nginx.mov";
     dtcurl_init(&curl_ctx, uri);
 
+    int64_t filesize = -1;
+    int ret = dtcurl_get_parameter(curl_ctx, KEY_CURL_GET_FILESIZE, &filesize);
+    printf("[%s:%d]filesize:%lld ret:%d\n", __FUNCTION__, __LINE__, (long long int)filesize, ret);
+
     char buf[1024];
-    int ret = 0;
     while (1) {
         ret = dtcurl_read(curl_ctx, buf, 1024);
         if (ret > 0) {

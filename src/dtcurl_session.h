@@ -19,7 +19,7 @@
 int dtcurl_session_open(dtcurl_session_t *session, const char *uri);
 int dtcurl_session_read(dtcurl_session_t *session, char *buf, int size);
 int dtcurl_session_seek(dtcurl_session_t *session, int64_t pos, int whence);
-int dtcurl_session_get_filesize(dtcurl_session_t *session);
+int64_t dtcurl_session_get_filesize(dtcurl_session_t *session);
 const char *dtcurl_session_get_location(dtcurl_session_t *session);
 int dtcurl_session_close(dtcurl_session_t *session);
 

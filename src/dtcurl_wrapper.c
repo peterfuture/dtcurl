@@ -28,21 +28,26 @@ static size_t write_function(void *buffer, size_t size, size_t nmemb, void *user
     dtcurl_wrapper_t *wrapper = (dtcurl_wrapper_t *)userp;
     http_context_t *http = &wrapper->http;
 
-    int total = size * nmemb;
+    if (http->open_quit == 0) {
+        CURL_LOG("HTTP open quit flag not set. maybe header response err\n");
+        http->open_quit = 1;
+    }
+
+    int64_t total = (int64_t)(size * nmemb);
     if (http->filesize < total + http->read_off) {
-        CURL_LOG("warnning- read too much data. readoff[%" PRId64 "] + total[%d] > filesize[%" PRId64 "]\n", http->read_off, total, http->filesize);
+        CURL_LOG("warnning- read too much data. readoff[%" PRId64 "] + total[%"PRId64"] > filesize[%" PRId64 "]\n", http->read_off, total, http->filesize);
         total = http->filesize - http->read_off;
     }
 
     int space = dtcurl_buf_space(&wrapper->cache);
     while (space < total) {
         usleep(10 * 1000);
-        CURL_LOG("space:%d total:%d\n", space, total);
+        CURL_LOG("space:%d total:%"PRId64"\n", space, total);
     }
 
     int ret = dtcurl_buf_put(&wrapper->cache, buffer, total);
     if (ret != total) {
-        CURL_LOG("Error, write failed. total:%d ret:%d \n", total, ret);
+        CURL_LOG("Error, write failed. total:%"PRId64" ret:%d \n", total, ret);
     }
 
     http->read_off += ret;
@@ -50,7 +55,7 @@ static size_t write_function(void *buffer, size_t size, size_t nmemb, void *user
         CURL_LOG("read finished \n");
         http->eof = 1;
     }
-    CURL_LOG("size:%d read_off:%"PRId64" filesize:%"PRId64"\n", total, http->read_off, http->filesize);
+    CURL_LOG("size:%"PRId64" read_off:%"PRId64" filesize:%"PRId64"\n", total, http->read_off, http->filesize);
     return nmemb * size;
 }
 
@@ -58,6 +63,7 @@ static int process_line(http_context_t *http, char *line)
 {
     char *ptr = line;
 
+    CURL_LOG("line:%s \n", line);
     if (line[0] == '\0') {
         http->end_header = 1;
         return 0;
@@ -82,7 +88,7 @@ static int process_line(http_context_t *http, char *line)
                 ptr++;
             }
             if (http->filesize < 0) {
-                http->filesize = atoll(ptr);
+                http->filesize = (int64_t)atoll(ptr);
                 CURL_LOG("get filesize:%"PRId64" \n", http->filesize);
             }
         }
@@ -106,6 +112,9 @@ static int process_line(http_context_t *http, char *line)
             }
         }
 
+        if (!strncasecmp(line, "\n", 1) || !strncasecmp(line, "\r", 1)) {
+            http->open_quit = 1;
+        }
         return 0;
     }
 
@@ -128,8 +137,9 @@ static int process_line(http_context_t *http, char *line)
     }
 
     //ERR CASE
-    if (http->http_code > 400) {
+    if (http->http_code > 400 && http->http_code < 600) {
         http->end_header = 1;
+        http->open_quit = 1;
         return CURL_ERROR_UNKOWN;
     }
 
@@ -172,7 +182,7 @@ static int curl_wrapper_setopt(dtcurl_wrapper_t *wrapper)
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_WRITEDATA, (void *)wrapper);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_HEADERFUNCTION, header_function);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_WRITEHEADER, (void *)wrapper);
-    code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_VERBOSE, 1L);
+    //code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_VERBOSE, 1L);
     //code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_DEBUGFUNCTION, debug_function);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
     code = curl_easy_setopt(wrapper->curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
@@ -336,6 +346,11 @@ static int http_open_cnt(dtcurl_wrapper_t *wrapper)
     ret = pthread_create(&tid, NULL, curl_download_loop, wrapper);
     pthread_setname_np(tid, "curl_download_thread");
     wrapper->download_pid = tid;
+
+    // wait open success
+    while (http->open_quit == 0) {
+        usleep(10000);
+    }
     return CURL_ERROR_NONE;
 }
 
@@ -350,6 +365,7 @@ static int http_open(dtcurl_wrapper_t *wrapper)
     http->read_off = 0;
     http->eof = -1;
     http->is_streamed = -1;
+    http->open_quit = 0;
     return http_open_cnt(wrapper);
 }
 
@@ -370,6 +386,7 @@ int dtcurl_wrapper_open(dtcurl_wrapper_t *wrapper, const char *uri)
         wrapper->proto = CURL_PROTO_HTTPS;
     }
 
+    CURL_LOG("[wrapper:%p] - fuck\n", wrapper);
     return http_open(wrapper);
 }
 
@@ -391,7 +408,7 @@ int dtcurl_wrapper_read(dtcurl_wrapper_t *wrapper, char *buf, int size)
 
 //ffmpeg support
 #define AV_SEEKSIZE 0x10000
-int dtcurl_wrapper_seek(dtcurl_wrapper_t *wrapper, int64_t off, int whence)
+int64_t dtcurl_wrapper_seek(dtcurl_wrapper_t *wrapper, int64_t off, int whence)
 {
     http_context_t *http = &wrapper->http;
     CURL_LOG("seekto off:%"PRId64"\n", off);
@@ -438,7 +455,7 @@ int dtcurl_wrapper_seek(dtcurl_wrapper_t *wrapper, int64_t off, int whence)
     return http_open_cnt(wrapper);
 }
 
-int dtcurl_wrapper_get_filesize(dtcurl_wrapper_t *wrapper)
+int64_t dtcurl_wrapper_get_filesize(dtcurl_wrapper_t *wrapper)
 {
     http_context_t *http = &wrapper->http;
     return http->filesize;

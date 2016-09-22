@@ -35,7 +35,7 @@ int dtcurl_read(void *priv, char *buf, int size)
     return dtcurl_session_read(session, buf, size);
 }
 
-int dtcurl_seek(void *priv, int64_t off, int whence)
+int64_t dtcurl_seek(void *priv, int64_t off, int whence)
 {
     dtcurl_session_t *session = (dtcurl_session_t *)priv;
     return dtcurl_session_seek(session, off, whence);
@@ -59,7 +59,9 @@ int dtcurl_get_parameter(void *priv, int key, void *value)
         *(int64_t *)value = dtcurl_session_get_filesize(session);
         break;
     case KEY_CURL_GET_LOCATION:
-        *(char **)value = strdup(dtcurl_session_get_location(session));
+        if (dtcurl_session_get_location(session)) {
+            *(char **)value = strdup(dtcurl_session_get_location(session));
+        }
         break;
     }
     return CURL_ERROR_NONE;
