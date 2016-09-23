@@ -27,6 +27,9 @@ int main(int argc, char **argv)
     int64_t filesize = -1;
     int ret = dtcurl_get_parameter(curl_ctx, KEY_CURL_GET_FILESIZE, &filesize);
     printf("[%s:%d]filesize:%lld ret:%d\n", __FUNCTION__, __LINE__, (long long int)filesize, ret);
+    char *location = NULL;
+    ret = dtcurl_get_parameter(curl_ctx, KEY_CURL_GET_LOCATION, &location);
+    printf("[%s:%d]location:%s\n", __FUNCTION__, __LINE__, location);
 
     char buf[1024];
     while (1) {
