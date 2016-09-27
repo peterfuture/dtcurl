@@ -18,6 +18,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <inttypes.h>
 
 #include "dtcurl_wrapper.h"
 #include "dtcurl_log.h"
@@ -35,7 +36,7 @@ static size_t write_function(void *buffer, size_t size, size_t nmemb, void *user
 
     int64_t total = (int64_t)(size * nmemb);
     if (http->filesize < total + http->read_off) {
-        CURL_LOG("warnning- read too much data. readoff[%" PRId64 "] + total[%"PRId64"] > filesize[%" PRId64 "]\n", http->read_off, total, http->filesize);
+        CURL_LOG("warnning- read too much data. readoff[%"PRId64"] + total[%"PRId64"] > filesize[%"PRId64"]\n", http->read_off, total, http->filesize);
         total = http->filesize - http->read_off;
     }
 
